@@ -37,15 +37,43 @@ router.get('/health', async (req, res) => {
     }
 });
 
+// Utility function to validate and format phone number
+const validateAndFormatPhoneNumber = (phoneNumber) => {
+    // Remove all non-digit characters
+    const cleaned = phoneNumber.replace(/\D/g, '');
+
+    // Check if it's a valid 10-digit number
+    if (cleaned.length !== 10) {
+        throw new Error('Phone number must be exactly 10 digits');
+    }
+
+    // Check if it's not all zeros or repeated digits
+    if (/^(\d)\1{9}$/.test(cleaned)) {
+        throw new Error('Invalid phone number pattern');
+    }
+
+    // Format as XXX-XXX-XXXX
+    return cleaned.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+};
+
 // POST /api/orders - Create a new order
 router.post('/', createOrderLimiter, [
     body('customerName')
         .trim()
         .isLength({ min: 2, max: 50 })
-        .withMessage('Customer name must be between 2 and 50 characters'),
+        .withMessage('Customer name must be between 2 and 50 characters')
+        .matches(/^[a-zA-Z\s]+$/)
+        .withMessage('Customer name can only contain letters and spaces'),
     body('phoneNumber')
         .trim()
-        .matches(/^\d{10}$/)
+        .custom((value) => {
+            try {
+                validateAndFormatPhoneNumber(value);
+                return true;
+            } catch (error) {
+                throw new Error(error.message);
+            }
+        })
         .withMessage('Please provide a valid 10-digit phone number'),
     body('items')
         .isArray({ min: 1 })
@@ -86,7 +114,7 @@ router.post('/', createOrderLimiter, [
         // Sanitize input
         const orderData = {
             customerName: req.body.customerName.trim(),
-            phoneNumber: req.body.phoneNumber.trim(),
+            phoneNumber: validateAndFormatPhoneNumber(req.body.phoneNumber.trim()),
             items: req.body.items,
             totalAmount: parseFloat(req.body.totalAmount),
             notes: req.body.notes?.trim(),
@@ -113,8 +141,17 @@ router.post('/', createOrderLimiter, [
 // GET /api/orders/:phoneNumber - Get orders by phone number
 router.get('/:phoneNumber',
     [
-        param('phoneNumber').trim().notEmpty()
-            .matches(/^\+?[\d\s-]+$/).withMessage('Valid phone number is required')
+        param('phoneNumber')
+            .trim()
+            .custom((value) => {
+                try {
+                    validateAndFormatPhoneNumber(value);
+                    return true;
+                } catch (error) {
+                    throw new Error(error.message);
+                }
+            })
+            .withMessage('Please provide a valid 10-digit phone number')
     ],
     async (req, res) => {
         const errors = validationResult(req);

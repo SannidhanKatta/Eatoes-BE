@@ -1,112 +1,198 @@
 # Digital Diner Backend
 
-A Node.js-based backend server for the Digital Diner restaurant ordering system.
+A Node.js-based backend server for the Digital Diner restaurant ordering system, utilizing both MongoDB and PostgreSQL databases.
 
-## Features
+## Live API
 
-- RESTful API endpoints for menu and orders
-- MongoDB for menu items storage
-- PostgreSQL for order management
-- Input validation and sanitization
-- Error handling and logging
-- CORS support
-- Environment-based configuration
+[https://eatoes-be.onrender.com](https://eatos-be.onrender.com)
 
-## Tech Stack
+## Database Architecture
 
-- Node.js
-- Express.js
-- MongoDB with Mongoose
-- PostgreSQL with Prisma
-- Express Validator
-- CORS
-- dotenv for configuration
+### MongoDB (Menu Items)
 
-## Getting Started
+- Chosen for menu items due to:
+  - Flexible schema for varying menu item attributes
+  - Efficient for read-heavy operations
+  - Easy to update and modify menu structure
+  - Better for handling nested data (ingredients, variations)
+  - No complex relationships needed
 
-1. Clone the repository:
+### PostgreSQL (Orders & Users)
 
-```bash
-git clone <repository-url>
-cd digital-diner-backend
-```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Set up your environment variables by creating a `.env` file:
-
-```
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/digital-diner
-
-# PostgreSQL
-DATABASE_URL="postgresql://username:password@localhost:5432/digital-diner"
-
-# Server
-PORT=3000
-```
-
-4. Set up the databases:
-
-```bash
-# Initialize PostgreSQL database
-npx prisma migrate dev
-
-# Seed the MongoDB database with sample menu items
-npm run seed
-```
-
-5. Start the development server:
-
-```bash
-npm run dev
-```
-
-The server will be running at `http://localhost:3000`
+- Selected for order management due to:
+  - ACID compliance for order transactions
+  - Strong data consistency requirements
+  - Better for complex queries and reporting
+  - Structured data with relationships
+  - Future scalability for user management
 
 ## API Endpoints
 
-### Menu
+### Menu Endpoints (MongoDB)
 
-- `GET /api/menu` - Get all menu items
-- `GET /api/menu/categories` - Get menu items grouped by category
-- `POST /api/menu` - Add a new menu item (admin only)
-- `PUT /api/menu/:id` - Update a menu item (admin only)
-- `DELETE /api/menu/:id` - Delete a menu item (admin only)
+```
+GET /api/menu/categories
+- Returns menu items grouped by categories
+- Query params: none
+- Response: { [category: string]: MenuItem[] }
 
-### Orders
+GET /api/menu
+- Returns all menu items
+- Query params: none
+- Response: MenuItem[]
 
-- `POST /api/orders` - Place a new order
-- `GET /api/orders/:phoneNumber` - Get order history by phone number
-- `PUT /api/orders/:id` - Update order status (admin only)
+POST /api/menu (Admin)
+- Creates a new menu item
+- Body: { name, price, category, description }
+- Response: MenuItem
+
+PUT /api/menu/:id (Admin)
+- Updates a menu item
+- Body: { name?, price?, category?, description? }
+- Response: MenuItem
+
+DELETE /api/menu/:id (Admin)
+- Deletes a menu item
+- Response: { success: true }
+```
+
+### Order Endpoints (PostgreSQL)
+
+```
+POST /api/orders
+- Places a new order
+- Body: { customerName, phoneNumber, items[], totalAmount, notes? }
+- Response: { success: true, data: Order }
+
+GET /api/orders/:phoneNumber
+- Retrieves order history
+- Params: phoneNumber
+- Response: Order[]
+
+PUT /api/orders/:id (Admin)
+- Updates order status
+- Body: { status }
+- Response: Order
+```
+
+## Tech Stack
+
+- **Node.js & Express** - Server framework
+- **MongoDB & Mongoose** - Menu database & ODM
+- **PostgreSQL & Prisma** - Orders database & ORM
+- **Express Validator** - Input validation
+- **Express Rate Limit** - API rate limiting
+- **CORS** - Cross-origin resource sharing
+- **Swagger/OpenAPI** - API documentation
 
 ## Project Structure
 
 ```
 src/
-├── models/        # MongoDB models
-├── routes/        # API routes
-├── scripts/       # Database scripts
-└── index.js       # Main application file
+├── routes/          # API route handlers
+│   ├── menu.js     # Menu endpoints
+│   └── orders.js   # Order endpoints
+├── models/          # MongoDB models
+│   └── MenuItem.js # Menu item schema
+├── scripts/         # Database scripts
+│   └── initDb.js   # Database seeding
+└── index.js        # Main application file
 
 prisma/
-└── schema.prisma  # Prisma schema
+├── schema.prisma   # Prisma schema
+└── migrations/     # Database migrations
 ```
 
-## Environment Variables
+## Getting Started
 
-- `MONGODB_URI`: MongoDB connection string
-- `DATABASE_URL`: PostgreSQL connection string
-- `PORT`: Server port (default: 3000)
+1. Clone the repository:
 
-## Contributing
+   ```bash
+   git clone https://github.com/SannidhanKatta/Eatoes-BE.git
+   cd digital-diner/backend
+   ```
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file with:
+
+   ```
+   # MongoDB (for menu items)
+   MONGODB_URI=your-mongodb-connection-string
+
+   # PostgreSQL (for orders)
+   DATABASE_URL=your-postgresql-connection-string
+
+   # Server
+   PORT=3000
+   ```
+
+4. Set up the databases:
+
+   ```bash
+   # Generate Prisma client
+   npx prisma generate
+
+   # Run PostgreSQL migrations
+   npx prisma migrate deploy
+
+   # Seed the menu items in MongoDB
+   npm run seed
+   ```
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment
+
+The backend is deployed on Render:
+
+1. Configure environment variables in Render dashboard
+2. Set up build command: `npm install && npm run build`
+3. Set up start command: `npm start`
+4. Enable auto-deploy from GitHub
+
+## Error Handling
+
+- Consistent error response format
+- Validation error handling
+- Database error handling
+- Rate limiting errors
+- CORS error handling
+
+## Security Measures
+
+- Input validation and sanitization
+- Rate limiting on sensitive endpoints
+- CORS configuration
+- Error message sanitization
+- No sensitive data in responses
+
+## Performance Optimizations
+
+- Database connection pooling
+- Query optimization
+- Response caching (where appropriate)
+- Rate limiting
+- Efficient error handling
+
+## Monitoring and Logging
+
+- Error logging
+- Request logging
+- Database query logging
+- Performance monitoring
+
+## Known Limitations
+
+- Basic rate limiting implementation
+- No user authentication system
+- Limited admin functionality
+- Basic error logging
