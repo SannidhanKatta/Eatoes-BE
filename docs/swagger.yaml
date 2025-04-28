@@ -1,0 +1,70 @@
+openapi: 3.0.0
+info:
+  title: Digital Diner API
+  version: 1.0.0
+  description: API documentation for Digital Diner restaurant ordering system
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+
+paths:
+  /menu:
+    get:
+      summary: Get all menu items
+      responses:
+        '200':
+          description: List of menu items
+          
+  /menu/categories:
+    get:
+      summary: Get menu items grouped by category
+      responses:
+        '200':
+          description: Menu items grouped by categories
+
+  /orders:
+    post:
+      summary: Place a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customerName
+                - phoneNumber
+                - items
+                - totalAmount
+              properties:
+                customerName:
+                  type: string
+                phoneNumber:
+                  type: string
+                items:
+                  type: array
+                  items:
+                    type: object
+                totalAmount:
+                  type: number
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Order created successfully
+        '400':
+          description: Invalid input
+
+  /orders/{phoneNumber}:
+    get:
+      summary: Get order history by phone number
+      parameters:
+        - in: path
+          name: phoneNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of orders for the phone number 
