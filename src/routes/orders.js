@@ -1,43 +1,114 @@
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// POST /api/orders - Create a new order
-router.post('/',
-    [
-        body('customerName').trim().notEmpty().withMessage('Customer name is required'),
-        body('phoneNumber').trim().notEmpty()
-            .matches(/^\+?[\d\s-]+$/).withMessage('Valid phone number is required'),
-        body('items').isArray({ min: 1 }).withMessage('Order must contain at least one item'),
-        body('totalAmount').isFloat({ min: 0 }).withMessage('Total amount must be a positive number')
-    ],
-    async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
+// Rate limiting configuration
+const createOrderLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Limit each IP to 10 requests per windowMs
+    message: {
+        success: false,
+        error: 'Too many orders created from this IP, please try again after 15 minutes'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
-        try {
-            const order = await prisma.order.create({
-                data: {
-                    customerName: req.body.customerName,
-                    phoneNumber: req.body.phoneNumber,
-                    items: req.body.items,
-                    totalAmount: req.body.totalAmount,
-                    notes: req.body.notes || ''
-                }
-            });
+// Handle Prisma connection errors
+prisma.$connect()
+    .then(() => console.log('Successfully connected to database'))
+    .catch((error) => {
+        console.error('Failed to connect to database:', error);
+        process.exit(1);
+    });
 
-            res.status(201).json(order);
-        } catch (error) {
-            console.error('Order creation error:', error);
-            res.status(500).json({ error: 'Error creating order' });
-        }
+// Add connection health check endpoint
+router.get('/health', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.status(200).json({ status: 'healthy' });
+    } catch (error) {
+        console.error('Database health check failed:', error);
+        res.status(500).json({ status: 'unhealthy', error: error.message });
     }
-);
+});
+
+// POST /api/orders - Create a new order
+router.post('/', createOrderLimiter, [
+    body('customerName')
+        .trim()
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Customer name must be between 2 and 50 characters'),
+    body('phoneNumber')
+        .trim()
+        .matches(/^\d{10}$/)
+        .withMessage('Please provide a valid 10-digit phone number'),
+    body('items')
+        .isArray({ min: 1 })
+        .withMessage('Order must contain at least one item'),
+    body('items.*._id')
+        .exists()
+        .withMessage('Each item must have an _id'),
+    body('items.*.name')
+        .exists()
+        .withMessage('Each item must have a name'),
+    body('items.*.price')
+        .isFloat({ min: 0 })
+        .withMessage('Each item must have a valid price'),
+    body('items.*.quantity')
+        .isInt({ min: 1 })
+        .withMessage('Quantity must be at least 1'),
+    body('totalAmount')
+        .isFloat({ min: 0 })
+        .withMessage('Total amount must be a positive number'),
+    body('notes')
+        .optional()
+        .trim()
+        .isLength({ max: 500 })
+        .withMessage('Special instructions cannot exceed 500 characters')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            errors: errors.array().map(err => ({
+                field: err.param,
+                message: err.msg
+            }))
+        });
+    }
+
+    try {
+        // Sanitize input
+        const orderData = {
+            customerName: req.body.customerName.trim(),
+            phoneNumber: req.body.phoneNumber.trim(),
+            items: req.body.items,
+            totalAmount: parseFloat(req.body.totalAmount),
+            notes: req.body.notes?.trim(),
+            status: 'PENDING'
+        };
+
+        const order = await prisma.order.create({
+            data: orderData
+        });
+
+        return res.status(201).json({
+            success: true,
+            data: order
+        });
+    } catch (error) {
+        console.error('Order creation error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to create order. Please try again later.'
+        });
+    }
+});
 
 // GET /api/orders/:phoneNumber - Get orders by phone number
 router.get('/:phoneNumber',
