@@ -160,9 +160,12 @@ router.get('/:phoneNumber',
         }
 
         try {
+            const formattedPhoneNumber = validateAndFormatPhoneNumber(req.params.phoneNumber);
+            console.log('Searching for orders with formatted phone:', formattedPhoneNumber);
+
             const orders = await prisma.order.findMany({
                 where: {
-                    phoneNumber: req.params.phoneNumber
+                    phoneNumber: formattedPhoneNumber
                 },
                 orderBy: {
                     createdAt: 'desc'
@@ -170,7 +173,7 @@ router.get('/:phoneNumber',
             });
 
             console.log('Orders fetched successfully:', {
-                phoneNumber: req.params.phoneNumber,
+                phoneNumber: formattedPhoneNumber,
                 orderCount: orders.length
             });
 
