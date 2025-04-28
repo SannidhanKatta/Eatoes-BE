@@ -169,10 +169,22 @@ router.get('/:phoneNumber',
                 }
             });
 
+            console.log('Orders fetched successfully:', {
+                phoneNumber: req.params.phoneNumber,
+                orderCount: orders.length
+            });
+
             res.json(orders);
         } catch (error) {
-            console.error('Order fetch error:', error);
-            res.status(500).json({ error: 'Error fetching orders' });
+            console.error('Order fetch error:', {
+                error: error.message,
+                stack: error.stack,
+                phoneNumber: req.params.phoneNumber
+            });
+            res.status(500).json({
+                error: 'Error fetching orders',
+                details: error.message
+            });
         }
     }
 );
